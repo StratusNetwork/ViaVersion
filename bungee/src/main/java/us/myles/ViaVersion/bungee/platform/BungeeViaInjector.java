@@ -44,7 +44,8 @@ public class BungeeViaInjector implements ViaInjector {
 
     @Override
     public int getServerProtocolVersion() throws Exception {
-        return (int) ReflectionUtil.getStatic(Class.forName("net.md_5.bungee.protocol.ProtocolConstants"), "SUPPORTED_VERSION_IDS", List.class).get(0);
+        return 340;//Using version 1.12.2
+        //return (int) ReflectionUtil.getStatic(Class.forName("net.md_5.bungee.protocol.ProtocolConstants"), "SUPPORTED_VERSION_IDS", List.class).get(0);
     }
 
     @Override
