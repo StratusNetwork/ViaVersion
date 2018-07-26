@@ -27,9 +27,9 @@
     <dependencies>
         <!-- BungeeCord API -->
         <dependency>
-            <groupId>net.md-5</groupId>
+            <groupId>tc.oc</groupId>
             <artifactId>bungeecord-api</artifactId>
-            <version>1.10-SNAPSHOT</version>
+            <version>1.12-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
 
