@@ -32,8 +32,9 @@ public class ProtocolVersion {
     public static final ProtocolVersion v1_12;
     public static final ProtocolVersion v1_12_1;
     public static final ProtocolVersion v1_12_2;
-    // v1_13 as name for better ViaBackwards compatibility.
     public static final ProtocolVersion v1_13;
+    public static final ProtocolVersion v1_13_1;
+    public static final ProtocolVersion v1_13_2;
     public static final ProtocolVersion unknown;
 
     private final int id;
@@ -63,6 +64,8 @@ public class ProtocolVersion {
         register(v1_12_1 = new ProtocolVersion(338, "1.12.1"));
         register(v1_12_2 = new ProtocolVersion(340, "1.12.2"));
         register(v1_13 = new ProtocolVersion(393, "1.13"));
+        register(v1_13_1 = new ProtocolVersion(401, "1.13.1"));
+        register(v1_13_2 = new ProtocolVersion(404, "1.13.2"));
         register(unknown = new ProtocolVersion(-1, "UNKNOWN"));
     }
 
@@ -76,8 +79,9 @@ public class ProtocolVersion {
     }
 
     public static ProtocolVersion getProtocol(int id) {
-        if (versions.containsKey(id)) {
-            return versions.get(id);
+        ProtocolVersion protocolVersion = versions.get(id);
+        if (protocolVersion != null) {
+            return protocolVersion;
         } else {
             return new ProtocolVersion(id, "Unknown (" + id + ")");
         }

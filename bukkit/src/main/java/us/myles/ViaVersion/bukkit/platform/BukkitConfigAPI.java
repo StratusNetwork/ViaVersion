@@ -186,6 +186,11 @@ public class BukkitConfigAPI extends Config implements ViaVersionConfig {
     }
 
     @Override
+    public boolean isMinimizeCooldown() {
+        return getBoolean("minimize-cooldown", true);
+    }
+
+    @Override
     public URL getDefaultConfigURL() {
         return BukkitConfigAPI.class.getClassLoader().getResource("assets/viaversion/config.yml");
     }
@@ -203,5 +208,15 @@ public class BukkitConfigAPI extends Config implements ViaVersionConfig {
     @Override
     public boolean is1_13TeamColourFix() {
         return getBoolean("team-colour-fix", true);
+    }
+
+    @Override
+    public boolean isSuppress1_13ConversionErrors() {
+        return getBoolean("suppress-1_13-conversion-errors", false);
+    }
+
+    @Override
+    public boolean isDisable1_13AutoComplete() {
+        return getBoolean("disable-1_13-auto-complete", false);
     }
 }

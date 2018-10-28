@@ -30,6 +30,7 @@ import us.myles.ViaVersion.protocols.protocol1_13to1_12_2.types.Particle1_13Type
 import us.myles.ViaVersion.protocols.protocol1_9_3to1_9_1_2.storage.ClientWorld;
 import us.myles.ViaVersion.util.GsonUtil;
 
+import java.util.EnumMap;
 import java.util.Map;
 
 // Development of 1.13 support!
@@ -95,6 +96,28 @@ public class Protocol1_13To1_12_2 extends Protocol {
             }).send(Protocol1_13To1_12_2.class);
         }
     };
+
+    // @formatter:off
+    // These are arbitrary rewrite values, it just needs an invalid color code character.
+    protected static EnumMap<ChatColor, String> SCOREBOARD_TEAM_NAME_REWRITE = new EnumMap<ChatColor, String>(ChatColor.class) {{
+        put(ChatColor.BLACK,        ChatColor.COLOR_CHAR + "g");
+        put(ChatColor.DARK_BLUE,    ChatColor.COLOR_CHAR + "h");
+        put(ChatColor.DARK_GREEN,   ChatColor.COLOR_CHAR + "i");
+        put(ChatColor.DARK_AQUA,    ChatColor.COLOR_CHAR + "j");
+        put(ChatColor.DARK_RED,     ChatColor.COLOR_CHAR + "p");
+        put(ChatColor.DARK_PURPLE,  ChatColor.COLOR_CHAR + "q");
+        put(ChatColor.GOLD,         ChatColor.COLOR_CHAR + "s");
+        put(ChatColor.GRAY,         ChatColor.COLOR_CHAR + "t");
+        put(ChatColor.DARK_GRAY,    ChatColor.COLOR_CHAR + "u");
+        put(ChatColor.BLUE,         ChatColor.COLOR_CHAR + "v");
+        put(ChatColor.GREEN,        ChatColor.COLOR_CHAR + "w");
+        put(ChatColor.AQUA,         ChatColor.COLOR_CHAR + "x");
+        put(ChatColor.RED,          ChatColor.COLOR_CHAR + "y");
+        put(ChatColor.LIGHT_PURPLE, ChatColor.COLOR_CHAR + "z");
+        put(ChatColor.YELLOW,       ChatColor.COLOR_CHAR + "!");
+        put(ChatColor.WHITE,        ChatColor.COLOR_CHAR + "?");
+    }};
+    // @formatter:on
 
     static {
         MappingData.init();
@@ -198,10 +221,10 @@ public class Protocol1_13To1_12_2 extends Protocol {
         registerOutgoing(State.PLAY, 0x12, 0x13);
         registerOutgoing(State.PLAY, 0x13, 0x14);
         // InventoryPackets 0x14 -> 0x15
-        registerOutgoing(State.PLAY, 0x15, 0x16);
+        // InventoryPackets 0x15 -> 0x16
         // InventoryPackets 0x16 -> 0x17
         registerOutgoing(State.PLAY, 0x17, 0x18);
-        // InventoryPackets 0x18 -> 0x19
+        // WorldPackets 0x18 -> 0x19
         registerOutgoing(State.PLAY, 0x1A, 0x1B);
         registerOutgoing(State.PLAY, 0x1B, 0x1C);
         // New packet 0x1D - NBT Query
@@ -210,7 +233,31 @@ public class Protocol1_13To1_12_2 extends Protocol {
         registerOutgoing(State.PLAY, 0x1E, 0x20);
         registerOutgoing(State.PLAY, 0x1F, 0x21);
         // WorldPackets 0x20 -> 0x22
-        registerOutgoing(State.PLAY, 0x21, 0x23);
+
+        // Effect packet
+        registerOutgoing(State.PLAY, 0x21, 0x23, new PacketRemapper() {
+            @Override
+            public void registerMap() {
+                map(Type.INT); // Effect Id
+                map(Type.POSITION); // Location
+                map(Type.INT); // Data
+                handler(new PacketHandler() {
+                    @Override
+                    public void handle(PacketWrapper wrapper) throws Exception {
+                        int id = wrapper.get(Type.INT, 0);
+                        int data = wrapper.get(Type.INT, 1);
+                        if (id == 1010) { // Play record
+                            wrapper.set(Type.INT, 1, data = MappingData.oldToNewItems.get(data << 4));
+                        } else if (id == 2001) { // Block break + block break sound
+                            int blockId = data & 0xFFF;
+                            int blockData = data >> 12;
+                            wrapper.set(Type.INT, 1, data = WorldPackets.toNewId(blockId << 4 | blockData));
+                        }
+                    }
+                });
+            }
+        });
+
         // WorldPackets 0x22 -> 0x24
         // Join (save dimension id)
         registerOutgoing(State.PLAY, 0x23, 0x25, new PacketRemapper() {
@@ -391,7 +438,8 @@ public class Protocol1_13To1_12_2 extends Protocol {
                             }
 
                             if (Via.getConfig().is1_13TeamColourFix()) {
-                                colour = getLastColor(prefix);
+                                colour = getLastColor(prefix).ordinal();
+                                suffix = getLastColor(prefix).toString() + suffix;
                             }
 
                             wrapper.write(Type.VAR_INT, colour);
@@ -399,12 +447,39 @@ public class Protocol1_13To1_12_2 extends Protocol {
                             wrapper.write(Type.STRING, ChatRewriter.legacyTextToJson(prefix)); // Prefix
                             wrapper.write(Type.STRING, ChatRewriter.legacyTextToJson(suffix)); // Suffix
                         }
+
+                        if (action == 0 || action == 3 || action == 4) {
+                            String[] names = wrapper.read(Type.STRING_ARRAY); // Entities
+                            for (int i = 0; i < names.length; i++) {
+                                names[i] = rewriteTeamMemberName(names[i]);
+                            }
+                            wrapper.write(Type.STRING_ARRAY, names);
+                        }
                     }
                 });
 
             }
         });
-        registerOutgoing(State.PLAY, 0x45, 0x48);
+        registerOutgoing(State.PLAY, 0x45, 0x48, new PacketRemapper() {
+            @Override
+            public void registerMap() {
+                handler(new PacketHandler() {
+                    @Override
+                    public void handle(PacketWrapper wrapper) throws Exception {
+                        String displayName = wrapper.read(Type.STRING); // Display Name
+                        displayName = rewriteTeamMemberName(displayName);
+                        wrapper.write(Type.STRING, displayName);
+
+                        byte action = wrapper.read(Type.BYTE);
+                        wrapper.write(Type.BYTE, action);
+                        wrapper.passthrough(Type.STRING); // Objective Name
+                        if (action != 1) {
+                            wrapper.passthrough(Type.VAR_INT); // Value
+                        }
+                    }
+                });
+            }
+        });
         registerOutgoing(State.PLAY, 0x46, 0x49);
         registerOutgoing(State.PLAY, 0x47, 0x4A);
         registerOutgoing(State.PLAY, 0x48, 0x4B);
@@ -449,7 +524,9 @@ public class Protocol1_13To1_12_2 extends Protocol {
                             if (wrapper.passthrough(Type.BOOLEAN)) {
                                 wrapper.passthrough(Type.STRING); // Title
                                 wrapper.passthrough(Type.STRING); // Description
-                                wrapper.write(Type.FLAT_ITEM, wrapper.read(Type.ITEM)); // Translate item to flat item
+                                Item icon = wrapper.read(Type.ITEM);
+                                InventoryPackets.toClient(icon);
+                                wrapper.write(Type.FLAT_ITEM, icon); // Translate item to flat item
                                 wrapper.passthrough(Type.VAR_INT); // Frame type
                                 int flags = wrapper.passthrough(Type.INT); // Flags
                                 if ((flags & 1) != 0)
@@ -509,6 +586,10 @@ public class Protocol1_13To1_12_2 extends Protocol {
                 handler(new PacketHandler() {
                     @Override
                     public void handle(PacketWrapper wrapper) throws Exception {
+                        // Disable auto-complete if configured
+                        if (Via.getConfig().isDisable1_13AutoComplete()) {
+                            wrapper.cancel();
+                        }
                         int tid = wrapper.read(Type.VAR_INT);
                         // Save transaction id
                         wrapper.user().get(TabCompleteTracker.class).setTransactionId(tid);
@@ -814,11 +895,11 @@ public class Protocol1_13To1_12_2 extends Protocol {
     }
 
     private int getNewSoundID(final int oldID) {
-        return MappingData.oldToNewSounds.get(oldID);
+        return MappingData.soundMappings.getNewSound(oldID);
     }
 
     // Based on method from https://github.com/Bukkit/Bukkit/blob/master/src/main/java/org/bukkit/ChatColor.java
-    public int getLastColor(String input) {
+    public ChatColor getLastColor(String input) {
         int length = input.length();
 
         for (int index = length - 1; index > -1; index--) {
@@ -837,12 +918,32 @@ public class Protocol1_13To1_12_2 extends Protocol {
                         case RESET:
                             break;
                         default:
-                            return color.ordinal();
+                            return color;
                     }
                 }
             }
         }
 
-        return ChatColor.RESET.ordinal();
+        return ChatColor.RESET;
+    }
+
+    protected String rewriteTeamMemberName(String name) {
+        // The Display Name is just colours which overwrites the suffix
+        // It also overwrites for ANY colour in name but most plugins
+        // will just send colour as 'invisible' character
+        if (ChatColor.stripColor(name).length() == 0) {
+            StringBuilder newName = new StringBuilder();
+            for (int i = 0; i < name.length() / 2; i++) {
+                ChatColor color = ChatColor.getByChar(name.charAt(i * 2 + 1));
+                String rewrite = SCOREBOARD_TEAM_NAME_REWRITE.get(color);
+                if (rewrite != null) { // just in case, should never happen
+                    newName.append(rewrite);
+                } else {
+                    newName.append(name);
+                }
+            }
+            name = newName.toString();
+        }
+        return name;
     }
 }
